@@ -84,11 +84,9 @@ class TaskRunner(Runner):
         self,
         task: Task,
         state_handlers: Iterable[Callable] = None,
-        result_handler: "ResultHandler" = None, # todo: here
     ):
         self.context = prefect.context.to_dict()
         self.task = task
-        self.result_handler = task.result_handler or result_handler # todo: here
         super().__init__(state_handlers=state_handlers)
 
     def __repr__(self) -> str:
@@ -152,12 +150,12 @@ class TaskRunner(Runner):
                 "task_loop_count": state.cached_inputs.pop(  # type: ignore
                     "_loop_count"
                 )  # type: ignore
-                .to_result() # todo: here
+                .populate_result(self.task.result) # todo: here
                 .value,
                 "task_loop_result": state.cached_inputs.pop(  # type: ignore
                     "_loop_result"
                 )  # type: ignore
-                .to_result() # todo: here
+                .populate_result(self.task.result) # todo: here
                 .value,
             }
             context.update(loop_context)
@@ -581,13 +579,13 @@ class TaskRunner(Runner):
         for edge, upstream_state in upstream_states.items():
             # construct task inputs
             if edge.key is not None:
-                handlers[edge.key] = handler = getattr(
-                    edge.upstream_task, "result_handler", None # todo: here
+                handlers[edge.key] = result_skeleton = getattr(
+                    edge.upstream_task, "result", None # todo: here
                 )
                 task_inputs[  # type: ignore
                     edge.key
-                ] = upstream_state._result.to_result(  # type: ignore # todo: here
-                    handler
+                ] = upstream_state._result.populate_result(  # type: ignore # todo: here
+                    result_skeleton
                 )  # type: ignore
 
         if state.is_pending() and state.cached_inputs:
@@ -622,7 +620,7 @@ class TaskRunner(Runner):
             if self.task.cache_validator(
                 state, sanitized_inputs, prefect.context.get("parameters")
             ):
-                state._result = state._result.to_result(self.task.result_handler) # todo: here
+                state._result = state._result.populate_result(self.task.result)
                 return state
             else:
                 state = Pending("Cache was invalid; ready to run.")
@@ -636,8 +634,8 @@ class TaskRunner(Runner):
                 if self.task.cache_validator(
                     candidate, sanitized_inputs, prefect.context.get("parameters")
                 ):
-                    candidate._result = candidate._result.to_result(
-                        self.task.result_handler # todo: here
+                    candidate._result = candidate._result.populate_result(
+                        self.task.result
                     )
                     return candidate
 
@@ -876,11 +874,11 @@ class TaskRunner(Runner):
 
             if getattr(self.task, "log_stdout", False):
                 with redirect_stdout(prefect.utilities.logging.RedirectToLog(self.logger)):  # type: ignore
-                    result = timeout_handler(
+                    return_value = timeout_handler(
                         self.task.run, timeout=self.task.timeout, **raw_inputs
                     )
             else:
-                result = timeout_handler(
+                return_value = timeout_handler(
                     self.task.run, timeout=self.task.timeout, **raw_inputs
                 )
 
@@ -901,8 +899,8 @@ class TaskRunner(Runner):
         except signals.LOOP as exc:
             new_state = exc.state
             assert isinstance(new_state, Looped)
-            new_state.result = Result( # todo: here
-                value=new_state.result, result_handler=self.result_handler # todo: here
+            new_state.result = self.task.result.write(
+                value=new_state.result, **prefect.context
             )
             new_state.cached_inputs = inputs
             new_state.message = exc.state.message or "Task is looping ({})".format(
@@ -910,19 +908,19 @@ class TaskRunner(Runner):
             )
             return new_state
 
-        result = Result(value=result, result_handler=self.result_handler) # todo: here
+        result = self.task.result.write(return_value, **prefect.context)
         state = Success(
-            result=result, message="Task run succeeded.", cached_inputs=inputs # todo: here
+            result=result, message="Task run succeeded.", cached_inputs=inputs
         )
 
         ## checkpoint tasks if a result_handler is present, except for when the user has opted out by disabling checkpointing
-        if (
-            state.is_successful()
-            and prefect.context.get("checkpointing") is True
-            and self.task.checkpoint is not False
-            and self.result_handler is not None # todo: here
-        ):
-            state._result.store_safe_value() # todo: here
+        # if (
+        #     state.is_successful()
+        #     and prefect.context.get("checkpointing") is True
+        #     and self.task.checkpoint is not False
+        #     and self.result_handler is not None # todo: here
+        # ):
+        #     state._result.store_safe_value() # todo: here
 
         return state
 
@@ -984,11 +982,9 @@ class TaskRunner(Runner):
                 loop_context = {
                     "_loop_count": Result( # todo: here
                         value=prefect.context["task_loop_count"],
-                        result_handler=JSONResultHandler(), # todo: here
                     ),
                     "_loop_result": Result( # todo: here
                         value=prefect.context.get("task_loop_result"),
-                        result_handler=self.result_handler, # todo: here
                     ),
                 }
                 inputs.update(loop_context)

@@ -66,28 +66,55 @@ class GCSResult(Result):
     def __setstate__(self, state: dict) -> None:
         self.__dict__.update(state)
 
-    def write(self) -> str:
+    def write(self, value: Any, **kwargs) -> str:
         """
         Writes the result value to a location in GCS and returns the resulting URI.
+
+        This method takes two arguments:
+            - value: the value to be written
+            - **kwargs: values used to format the filename template for this result
+        Should return a _new_ result object with the appropriately formatted filepath.
 
         Returns:
             - str: the GCS URI
         """
 
         if not self._rendered_filepath:
-            raise ValueError("Must call `Result.format()` first")
+            res = self.format(**kwargs)
+        else:
+            # do I ever expect to have the rendered one?
+            res = self
+
+        if value:
+            res.value = value
 
         self.logger.debug(
-            "Starting to upload result to {}...".format(self._rendered_filepath)
+            "Starting to upload result to {}...".format(res._rendered_filepath)
         )
-        binary_data = self.serialize().decode()
+        binary_data = res.serialize().decode()
 
-        self.gcs_bucket.blob(self._rendered_filepath).upload_from_string(binary_data)
-        self.logger.debug(
-            "Finished uploading result to {}.".format(self._rendered_filepath)
+        res.gcs_bucket.blob(res._rendered_filepath).upload_from_string(binary_data)
+        res.logger.debug(
+            "Finished uploading result to {}.".format(res._rendered_filepath)
         )
 
-        return self._rendered_filepath
+        return res
+
+    def populate_result(self, result: Result) -> "Result":
+        """
+        This should be the "hydration" step that we should call as early as possible with the task's .result attribute
+        This method should pass `self.filepath` to result.read() and return a newly hydrated result object.
+        """
+        # use the passed result's read method, off of the state result's filepath attribute
+        val = result.read(self._rendered_filepath)
+        # populate a new instance off the task's result (?correct?) that has the value in it
+        res = result.copy()
+        res.value = val
+        # take the filepath off the state's result
+        res._rendered_filepath = self._rendered_filepath
+
+        return res
+
 
     def read(self, loc: str = None) -> Any:
         """
