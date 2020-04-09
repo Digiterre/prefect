@@ -132,10 +132,12 @@ class LambdaCreate(Task):
         aws_credentials = Secret(aws_credentials_secret).get()
         aws_access_key = aws_credentials["ACCESS_KEY"]
         aws_secret_access_key = aws_credentials["SECRET_ACCESS_KEY"]
+        aws_session_token = aws_credentials["SESSION_TOKEN"]
         lambda_client = boto3.client(
             "lambda",
             aws_access_key_id=aws_access_key,
             aws_secret_access_key=aws_secret_access_key,
+            aws_session_token=aws_session_token,
         )
 
         ## create lambda function
@@ -206,10 +208,12 @@ class LambdaDelete(Task):
         aws_credentials = Secret(aws_credentials_secret).get()
         aws_access_key = aws_credentials["ACCESS_KEY"]
         aws_secret_access_key = aws_credentials["SECRET_ACCESS_KEY"]
+        aws_session_token = aws_credentials["SESSION_TOKEN"]
         lambda_client = boto3.client(
             "lambda",
             aws_access_key_id=aws_access_key,
             aws_secret_access_key=aws_secret_access_key,
+            aws_session_token=aws_session_token,
         )
 
         ## delete function, depending on if qualifier provided
@@ -315,10 +319,12 @@ class LambdaInvoke(Task):
         aws_credentials = Secret(aws_credentials_secret).get()
         aws_access_key = aws_credentials["ACCESS_KEY"]
         aws_secret_access_key = aws_credentials["SECRET_ACCESS_KEY"]
+        aws_session_token = aws_credentials["SESSION_TOKEN"]
         lambda_client = boto3.client(
             "lambda",
             aws_access_key_id=aws_access_key,
             aws_secret_access_key=aws_secret_access_key,
+            aws_session_token=aws_session_token,
         )
 
         ## invoke lambda function
@@ -388,10 +394,12 @@ class LambdaList(Task):
         aws_credentials = Secret(aws_credentials_secret).get()
         aws_access_key = aws_credentials["ACCESS_KEY"]
         aws_secret_access_key = aws_credentials["SECRET_ACCESS_KEY"]
+        aws_session_token = aws_credentials["SESSION_TOKEN"]
         lambda_client = boto3.client(
             "lambda",
             aws_access_key_id=aws_access_key,
             aws_secret_access_key=aws_secret_access_key,
+            aws_session_token=aws_session_token,
         )
 
         ## list functions, optionally passing in marker if not None
